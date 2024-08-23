@@ -12,6 +12,8 @@ import os
 import assemblyai as aai
 import openai
 import yt_dlp
+import requests
+import httpx 
 
 
 # Create your views here.
@@ -73,6 +75,7 @@ def download_audio(link):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
+        'ffmpeg_location': '/usr/bin/ffmpeg', 
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([link])
@@ -82,25 +85,58 @@ def download_audio(link):
 def get_transcrption(link):
     audio_file = download_audio(link)
     aai.settings.api_key = "67a937186b55489ea297a21f2dca423d"
-
+    # try:
     transcriber = aai.Transcriber()
     transcript = transcriber.transcribe(audio_file)
-
-    return transcript.text  
+    return transcript.text
+    # except:
+        # return JsonResponse({'error': 'The upload operation timed out, please increase the timeout'}, status= 405)
+    # return transcript.text  
 
 
 def generate_blog_from_transcription(transcription):
-    openai.api_key = "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"
 
-    prompt = f"Based on the following transcript from a YouTube video, write a comprehensive blog article, write it based on the transcript, but don't make it look like a youtube video, make it look like a proper blog: \n\n{transcription}\n\n Article:"
 
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=prompt,
-        max_tokens=1000 
+    # prompt = f"Based on the following transcript from a YouTube video, write a comprehensive blog article, write it based on the transcript, but don't make it look like a youtube video, make it look like a proper blog: \n\n{transcription}\n\n Article:"
+
+    # response = openai.Completion.create(
+    #     model="gpt-3.5-turbo-instruct",
+    #     prompt=prompt,
+    #     max_tokens=1000 
+    # )
+
+    # generated_content = response.choices[0].text.strip()
+
+    # return generated_content
+
+    api_key = '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'  # Replace with your Hugging Face API key
+
+    prompt = f"Based on the following transcript from a YouTube video, write a comprehensive blog article, write it based on the transcript, but don't make it look like a YouTube video, make it look like a proper blog: \n\n{transcription}\n\n Article:"
+
+    response = requests.post(
+        'https://api-inference.huggingface.co/models/gpt2',
+        headers={'Authorization': f'Bearer {api_key}'},
+        json={'inputs': prompt, 'parameters': {'max_length': 1000}}
     )
 
-    generated_content = response.choices[0].text.strip()
+    # generated_content = response.json()[0]['generated_text'].strip()
+
+    # return generated_content
+
+    try:
+        # Check the response structure
+        response_json = response.json()
+        print("API Response:", response_json)
+
+        if isinstance(response_json, list) and len(response_json) > 0 and 'generated_text' in response_json[0]:
+            generated_content = response_json[0]['generated_text'].strip()
+        else:
+            # Handle unexpected response format
+            return "Error: Unexpected response format from the API."
+
+    except Exception as e:
+        # Handle any other exceptions that may occur
+        return f"Error: {str(e)}"
 
     return generated_content
 
